@@ -41,12 +41,12 @@ function apiDevServerPlugin() {
           }
 
           if (req.url.startsWith('/api/config')) {
-            const configHandler = (await import('./api/config')).default;
+            const configHandler = (await import('./api/config.js')).default;
             return await configHandler(req, customRes);
           }
 
           if (req.url.startsWith('/api/upload')) {
-            const uploadHandler = (await import('./api/upload')).default;
+            const uploadHandler = (await import('./api/upload.js')).default;
             return await uploadHandler(req, customRes);
           }
         } catch (err: any) {

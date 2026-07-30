@@ -1,4 +1,3 @@
-import { MongoClient, Db } from 'mongodb';
 import { birthdayConfig, BirthdayConfigType } from '../config/birthdayConfig';
 
 const MONGODB_URI = process.env.MONGODB_URI || '';
@@ -12,24 +11,22 @@ const GLOBAL_CLOUD_DOC_ID = '6a6b7a6280807903e8b0e435';
 const GLOBAL_CLOUD_DOC_URL = `${GLOBAL_CLOUD_DB_BASE}/${GLOBAL_CLOUD_DOC_ID}`;
 
 // Global cache for MongoDB serverless connection
-let cachedClient: MongoClient | null = null;
-let cachedDb: Db | null = null;
+let cachedDb: any = null;
 
-async function getMongoDb(): Promise<Db | null> {
+async function getMongoDb(): Promise<any> {
   if (!MONGODB_URI || MONGODB_URI.includes('cluster0.mongodb.net')) {
     return null;
   }
   if (cachedDb) return cachedDb;
 
   try {
-    if (!cachedClient) {
-      cachedClient = new MongoClient(MONGODB_URI, {
-        connectTimeoutMS: 5000,
-        serverSelectionTimeoutMS: 5000,
-      });
-      await cachedClient.connect();
-    }
-    cachedDb = cachedClient.db(DB_NAME);
+    const { MongoClient } = await import('mongodb');
+    const client = new MongoClient(MONGODB_URI, {
+      connectTimeoutMS: 5000,
+      serverSelectionTimeoutMS: 5000,
+    });
+    await client.connect();
+    cachedDb = client.db(DB_NAME);
     return cachedDb;
   } catch (error) {
     console.warn('MongoDB Atlas connection unavailable, falling back to Global Cloud DB REST:', error);
