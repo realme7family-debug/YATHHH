@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import { birthdayConfig, PhotoItem, StatItem } from '../config/birthdayConfig';
+import { birthdayConfig } from '../config/birthdayConfig';
+import { getDatabaseConfig, saveDatabaseConfig, resetDatabaseConfig } from '../lib/db';
 
 export type BirthdayConfigType = typeof birthdayConfig;
 
@@ -33,6 +34,9 @@ export const ConfigProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       letter: {
         ...birthdayConfig.letter,
         ...(data.letter || {}),
+        paragraphs: Array.isArray(data.letter?.paragraphs)
+          ? data.letter.paragraphs
+          : birthdayConfig.letter.paragraphs,
       },
       photos: Array.isArray(data.photos) ? data.photos : birthdayConfig.photos,
       quotes: Array.isArray(data.quotes) ? data.quotes : birthdayConfig.quotes,
@@ -41,97 +45,43 @@ export const ConfigProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   };
 
   /**
-   * Refetch latest config from Production Database API
+   * Refetch latest config from Supabase / Database (loaded ONCE)
    */
   const refetchConfig = useCallback(async () => {
+    setIsLoading(true);
     try {
-      // Prevent browser & CDN caching by attaching a unique timestamp parameter
-      const res = await fetch(`/api/config?t=${Date.now()}`, {
-        method: 'GET',
-        headers: {
-          'Cache-Control': 'no-cache, no-store, must-revalidate',
-          'Pragma': 'no-cache',
-        },
-        cache: 'no-store',
-      });
-
-      if (!res.ok) {
-        throw new Error(`Server returned status ${res.status}`);
-      }
-
-      const json = await res.json();
-      if (json.success && json.data) {
-        const formatted = formatConfig(json.data);
-        setConfig(prevConfig => {
-          if (JSON.stringify(prevConfig) === JSON.stringify(formatted)) {
-            return prevConfig;
-          }
-          return formatted;
-        });
+      const dbData = await getDatabaseConfig();
+      if (dbData) {
+        const formatted = formatConfig(dbData);
+        setConfig(formatted);
         setError(null);
       }
     } catch (e: any) {
-      console.error('Failed to fetch config from Production Database API:', e);
-      setError(e.message || 'Error syncing with production database');
+      console.error('Failed to fetch config from database:', e);
+      setError(e.message || 'Error syncing with database');
     } finally {
       setIsLoading(false);
     }
   }, []);
 
-  // Initial fetch on mount & background auto-sync polling across devices
+  // Fetch data ONCE on mount. No polling intervals or auto-refetch loops that reset form state!
   useEffect(() => {
     refetchConfig();
-
-    // Polling interval every 3 seconds for live near-instant global synchronization across all devices
-    const intervalId = setInterval(() => {
-      refetchConfig();
-    }, 3000);
-
-    // Immediate refetch when window or tab regains focus
-    const handleFocus = () => {
-      refetchConfig();
-    };
-
-    window.addEventListener('focus', handleFocus);
-    window.addEventListener('visibilitychange', () => {
-      if (document.visibilityState === 'visible') {
-        refetchConfig();
-      }
-    });
-
-    return () => {
-      clearInterval(intervalId);
-      window.removeEventListener('focus', handleFocus);
-    };
   }, [refetchConfig]);
 
   /**
-   * Save updated configuration to Production Database
+   * Save updated configuration to Database / Supabase
    */
   const updateConfig = async (newConfig: BirthdayConfigType): Promise<boolean> => {
     setIsSaving(true);
     setError(null);
     try {
-      const res = await fetch('/api/config', {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'Cache-Control': 'no-cache, no-store, must-revalidate',
-        },
-        cache: 'no-store',
-        body: JSON.stringify(newConfig),
-      });
-
-      let json = { data: newConfig };
-      try {
-        json = await res.json();
-      } catch (e) {}
-
-      const updatedDoc = formatConfig(json.data || newConfig);
+      const savedDoc = await saveDatabaseConfig(newConfig);
+      const updatedDoc = formatConfig(savedDoc || newConfig);
       setConfig(updatedDoc);
       return true;
     } catch (e: any) {
-      console.warn('Network save warning (applied to local context):', e);
+      console.warn('Network save warning, retaining updated context state:', e);
       setConfig(formatConfig(newConfig));
       return true;
     } finally {
@@ -140,34 +90,18 @@ export const ConfigProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   };
 
   /**
-   * Reset configuration in Production Database to initial defaults
+   * Reset configuration to initial defaults
    */
   const resetConfig = async (): Promise<boolean> => {
     setIsSaving(true);
     setError(null);
     try {
-      const res = await fetch('/api/config', {
-        method: 'DELETE',
-        headers: {
-          'Cache-Control': 'no-cache, no-store, must-revalidate',
-        },
-        cache: 'no-store',
-      });
-
-      if (!res.ok) {
-        throw new Error(`Database reset failed with status ${res.status}`);
-      }
-
-      const json = await res.json();
-      if (json.success && json.data) {
-        const resetDoc = formatConfig(json.data);
-        setConfig(resetDoc);
-        await refetchConfig();
-        return true;
-      }
-      return false;
+      const resetDoc = await resetDatabaseConfig();
+      const formatted = formatConfig(resetDoc);
+      setConfig(formatted);
+      return true;
     } catch (e: any) {
-      console.error('Failed to reset config in Production Database:', e);
+      console.error('Failed to reset database:', e);
       setError(e.message || 'Failed to reset database');
       return false;
     } finally {

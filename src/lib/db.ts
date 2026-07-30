@@ -1,217 +1,165 @@
 import { birthdayConfig, BirthdayConfigType } from '../config/birthdayConfig';
 
-const MONGODB_URI = process.env.MONGODB_URI || '';
-const DB_NAME = process.env.MONGODB_DB || 'yaathh_birthday';
-const COLLECTION_NAME = 'config';
-const MEDIA_COLLECTION = 'media';
+// Supabase API Credentials
+const SUPABASE_BASE_URL = 'https://njfafjfosrdahwamncus.supabase.co/rest/v1';
+const SUPABASE_API_KEY = 'sb_publishable_iV1GPV3oNzXmgLJbyY4WQw_aN0A_ZiX';
+const TABLE_NAME = 'config';
+const DOC_ID = 'production_config';
 
-// Primary Single Source of Truth Global Cloud Database Endpoint
-const GLOBAL_CLOUD_DB_BASE = 'https://crudcrud.com/api/0ac992c15d2b480a8a101dd63b738841/config';
-const GLOBAL_CLOUD_DOC_ID = '6a6b7e5e80807903e8b0e462';
-const GLOBAL_CLOUD_DOC_URL = `${GLOBAL_CLOUD_DB_BASE}/${GLOBAL_CLOUD_DOC_ID}`;
+const LOCAL_STORAGE_KEY = 'yaathh_birthday_config_v1';
 
-// Global cache for MongoDB serverless connection
-let cachedDb: any = null;
+// Headers for Supabase REST API
+const getSupabaseHeaders = () => ({
+  'apikey': SUPABASE_API_KEY,
+  'Authorization': `Bearer ${SUPABASE_API_KEY}`,
+  'Content-Type': 'application/json',
+  'Cache-Control': 'no-cache, no-store, must-revalidate',
+  'Pragma': 'no-cache',
+});
 
-async function getMongoDb(): Promise<any> {
-  if (!MONGODB_URI || MONGODB_URI.includes('cluster0.mongodb.net')) {
-    return null;
+// Helper to merge loaded raw data into complete BirthdayConfigType schema
+function mergeConfigSchema(rawData: any): BirthdayConfigType {
+  if (!rawData || typeof rawData !== 'object') {
+    return { ...birthdayConfig };
   }
-  if (cachedDb) return cachedDb;
-
-  try {
-    const { MongoClient } = await import('mongodb');
-    const client = new MongoClient(MONGODB_URI, {
-      connectTimeoutMS: 5000,
-      serverSelectionTimeoutMS: 5000,
-    });
-    await client.connect();
-    cachedDb = client.db(DB_NAME);
-    return cachedDb;
-  } catch (error) {
-    console.warn('MongoDB Atlas connection unavailable, falling back to Global Cloud DB REST:', error);
-    return null;
-  }
+  return {
+    ...birthdayConfig,
+    ...rawData,
+    letter: {
+      ...birthdayConfig.letter,
+      ...(rawData.letter || {}),
+      paragraphs: Array.isArray(rawData.letter?.paragraphs) 
+        ? rawData.letter.paragraphs 
+        : birthdayConfig.letter.paragraphs,
+    },
+    photos: Array.isArray(rawData.photos) ? rawData.photos : birthdayConfig.photos,
+    quotes: Array.isArray(rawData.quotes) ? rawData.quotes : birthdayConfig.quotes,
+    stats: Array.isArray(rawData.stats) ? rawData.stats : birthdayConfig.stats,
+  };
 }
 
 /**
- * Fetch latest config from single Global Cloud Database REST endpoint
+ * Fetch latest config from Supabase Database (with local storage backup)
  */
-async function fetchGlobalCloudConfig(): Promise<BirthdayConfigType | null> {
+export async function getDatabaseConfig(): Promise<BirthdayConfigType> {
+  // 1. Try Supabase REST Endpoint first
   try {
-    const res = await fetch(`${GLOBAL_CLOUD_DB_BASE}?t=${Date.now()}`, {
+    const res = await fetch(`${SUPABASE_BASE_URL}/${TABLE_NAME}?id=eq.${DOC_ID}&select=*&t=${Date.now()}`, {
       method: 'GET',
-      headers: {
-        'Cache-Control': 'no-cache, no-store, must-revalidate',
-        'Pragma': 'no-cache',
-      },
+      headers: getSupabaseHeaders(),
       cache: 'no-store',
     });
 
     if (res.ok) {
-      const docs = await res.json();
-      if (Array.isArray(docs) && docs.length > 0) {
-        const latestDoc = docs[docs.length - 1];
-        const { _id, ...cleanData } = latestDoc;
-        if (cleanData && cleanData.name) {
-          return { ...birthdayConfig, ...cleanData };
+      const rows = await res.json();
+      if (Array.isArray(rows) && rows.length > 0) {
+        const row = rows[0];
+        const data = row.data || row.config || row;
+        if (data && typeof data === 'object') {
+          const merged = mergeConfigSchema(data);
+          // Sync to localStorage backup
+          try { localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(merged)); } catch (e) {}
+          return merged;
         }
       }
     }
   } catch (err) {
-    console.error('Error fetching from Global Cloud DB REST:', err);
+    console.warn('Supabase DB fetch warning, attempting fallback storage:', err);
   }
-  return null;
-}
 
-/**
- * Save updated config to single Global Cloud Database REST endpoint
- */
-async function saveGlobalCloudConfig(config: BirthdayConfigType): Promise<BirthdayConfigType> {
+  // 2. LocalStorage backup
   try {
-    const { _id, ...cleanPayload } = config as any;
-
-    // Try updating existing document
-    const putRes = await fetch(GLOBAL_CLOUD_DOC_URL, {
-      method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json',
-        'Cache-Control': 'no-cache, no-store, must-revalidate',
-      },
-      body: JSON.stringify(cleanPayload),
-    });
-
-    if (putRes.ok || putRes.status === 200) {
-      return { ...birthdayConfig, ...cleanPayload };
-    } else {
-      // If PUT fails, post new document
-      const postRes = await fetch(GLOBAL_CLOUD_DB_BASE, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Cache-Control': 'no-cache, no-store, must-revalidate',
-        },
-        body: JSON.stringify(cleanPayload),
-      });
-
-      if (postRes.ok) {
-        const json = await postRes.json();
-        const { _id: newId, ...savedData } = json;
-        return { ...birthdayConfig, ...savedData };
+    const local = localStorage.getItem(LOCAL_STORAGE_KEY);
+    if (local) {
+      const parsed = JSON.parse(local);
+      if (parsed && typeof parsed === 'object') {
+        return mergeConfigSchema(parsed);
       }
     }
-  } catch (err) {
-    console.error('Error saving to Global Cloud DB REST:', err);
-  }
-  return config;
+  } catch (e) {}
+
+  // 3. Initial Default Schema
+  return { ...birthdayConfig };
 }
 
 /**
- * GET current configuration from Single Production Database
- */
-export async function getDatabaseConfig(): Promise<BirthdayConfigType> {
-  const db = await getMongoDb();
-  if (db) {
-    try {
-      const collection = db.collection(COLLECTION_NAME);
-      const doc = await collection.findOne({ _id: 'production_config' as any });
-      if (doc && doc.config) {
-        return { ...birthdayConfig, ...doc.config };
-      } else {
-        await collection.updateOne(
-          { _id: 'production_config' as any },
-          { $set: { config: birthdayConfig, updatedAt: new Date() } },
-          { upsert: true }
-        );
-        return birthdayConfig;
-      }
-    } catch (err) {
-      console.error('Error fetching config from MongoDB Atlas:', err);
-    }
-  }
-
-  // Single Global Cloud Database endpoint
-  const cloudData = await fetchGlobalCloudConfig();
-  if (cloudData) {
-    return cloudData;
-  }
-
-  return birthdayConfig;
-}
-
-/**
- * SAVE/UPDATE configuration in Single Production Database
+ * Save updated config to Supabase Database (and sync local storage)
  */
 export async function saveDatabaseConfig(newConfig: BirthdayConfigType): Promise<BirthdayConfigType> {
   if (!newConfig || typeof newConfig !== 'object') {
     throw new Error('Invalid configuration object');
   }
 
-  const db = await getMongoDb();
-  if (db) {
-    try {
-      const collection = db.collection(COLLECTION_NAME);
-      await collection.updateOne(
-        { _id: 'production_config' as any },
-        { $set: { config: newConfig, updatedAt: new Date() } },
-        { upsert: true }
-      );
-      const updatedDoc = await collection.findOne({ _id: 'production_config' as any });
-      if (updatedDoc && updatedDoc.config) {
-        saveGlobalCloudConfig(updatedDoc.config as BirthdayConfigType).catch(() => {});
-        return { ...birthdayConfig, ...updatedDoc.config };
+  const cleanConfig = mergeConfigSchema(newConfig);
+
+  // 1. Always save to LocalStorage immediately for instant persistence
+  try {
+    localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(cleanConfig));
+  } catch (e) {}
+
+  // 2. Upsert to Supabase REST API
+  try {
+    const payload = {
+      id: DOC_ID,
+      data: cleanConfig,
+      updated_at: new Date().toISOString(),
+    };
+
+    // Attempt Upsert (Prefer: resolution=merge-duplicates)
+    const upsertRes = await fetch(`${SUPABASE_BASE_URL}/${TABLE_NAME}`, {
+      method: 'POST',
+      headers: {
+        ...getSupabaseHeaders(),
+        'Prefer': 'resolution=merge-duplicates,return=representation',
+      },
+      body: JSON.stringify(payload),
+    });
+
+    if (upsertRes.ok) {
+      const rows = await upsertRes.json();
+      if (Array.isArray(rows) && rows.length > 0) {
+        const savedData = rows[0].data || cleanConfig;
+        return mergeConfigSchema(savedData);
       }
-    } catch (err) {
-      console.error('Error saving config to MongoDB Atlas:', err);
+    } else if (upsertRes.status === 404 || upsertRes.status === 400) {
+      // Try PATCH directly if row already exists
+      const patchRes = await fetch(`${SUPABASE_BASE_URL}/${TABLE_NAME}?id=eq.${DOC_ID}`, {
+        method: 'PATCH',
+        headers: {
+          ...getSupabaseHeaders(),
+          'Prefer': 'return=representation',
+        },
+        body: JSON.stringify(payload),
+      });
+
+      if (patchRes.ok) {
+        const rows = await patchRes.json();
+        if (Array.isArray(rows) && rows.length > 0) {
+          return mergeConfigSchema(rows[0].data || cleanConfig);
+        }
+      }
     }
+  } catch (err) {
+    console.warn('Supabase DB save warning (saved to persistent local storage):', err);
   }
 
-  // Save to single Global Cloud Database endpoint
-  return await saveGlobalCloudConfig(newConfig);
+  return cleanConfig;
 }
 
 /**
- * RESET configuration to defaults in Single Production Database
+ * Reset configuration in Supabase Database to default schema
  */
 export async function resetDatabaseConfig(): Promise<BirthdayConfigType> {
-  const db = await getMongoDb();
-  if (db) {
-    try {
-      const collection = db.collection(COLLECTION_NAME);
-      await collection.updateOne(
-        { _id: 'production_config' as any },
-        { $set: { config: birthdayConfig, updatedAt: new Date() } },
-        { upsert: true }
-      );
-      saveGlobalCloudConfig(birthdayConfig).catch(() => {});
-      return birthdayConfig;
-    } catch (err) {
-      console.error('Error resetting config in MongoDB Atlas:', err);
-    }
-  }
-
-  return await saveGlobalCloudConfig(birthdayConfig);
+  const defaultConfig = { ...birthdayConfig };
+  try {
+    localStorage.removeItem(LOCAL_STORAGE_KEY);
+  } catch (e) {}
+  return await saveDatabaseConfig(defaultConfig);
 }
 
 /**
- * SAVE Media File (Photo/Audio) into Database / Storage
+ * Save Media File (Photo/Audio)
  */
 export async function saveMediaFile(dataUrl: string, fileName: string): Promise<string> {
-  const db = await getMongoDb();
-  if (db) {
-    try {
-      const collection = db.collection(MEDIA_COLLECTION);
-      const mediaId = `media_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
-      await collection.insertOne({
-        _id: mediaId as any,
-        fileName,
-        dataUrl,
-        createdAt: new Date(),
-      });
-      return dataUrl;
-    } catch (err) {
-      console.error('Error saving media file to DB:', err);
-    }
-  }
   return dataUrl;
 }

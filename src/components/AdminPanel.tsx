@@ -16,6 +16,15 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onBackToPresentation }) 
   const [activeTab, setActiveTab] = useState<number>(0);
   const [savedNotification, setSavedNotification] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState<boolean>(false);
+  const isInitializedRef = useRef<boolean>(false);
+
+  // Populate form ONCE when initial database config finishes loading
+  React.useEffect(() => {
+    if (!isLoading && !isInitializedRef.current) {
+      setFormData(JSON.parse(JSON.stringify(config)));
+      isInitializedRef.current = true;
+    }
+  }, [isLoading, config]);
 
   // Password Security Lock State
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
@@ -74,6 +83,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onBackToPresentation }) 
     if (window.confirm("Are you sure you want to reset all content in the Production Database to original defaults?")) {
       const success = await resetConfig();
       if (success) {
+        setFormData(JSON.parse(JSON.stringify(config)));
         soundEngine.playPop();
         setSavedNotification("Reset database to original default config.");
         setTimeout(() => setSavedNotification(null), 3500);
@@ -158,11 +168,15 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onBackToPresentation }) 
       reader.onload = async (event) => {
         const content = event.target?.result as string;
         if (content) {
-          const success = await importConfig(content);
-          if (success) {
-            setSavedNotification("Imported & saved JSON to Production Database! 📥");
-            setTimeout(() => setSavedNotification(null), 3500);
-          } else {
+          try {
+            const parsed = JSON.parse(content);
+            const success = await importConfig(content);
+            if (success) {
+              setFormData(parsed);
+              setSavedNotification("Imported & saved JSON to Production Database! 📥");
+              setTimeout(() => setSavedNotification(null), 3500);
+            }
+          } catch(err) {
             alert("Invalid configuration file format.");
           }
         }
@@ -175,7 +189,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onBackToPresentation }) 
   if (!isAuthenticated) {
     return (
       <div className="min-h-screen bg-[#f5ede8] flex items-center justify-center p-4 font-sans">
-        <div className="bg-white/95 rounded-3xl p-8 md:p-10 max-w-md w-full shadow-2xl border border border-[#ebdcd0] text-center space-y-6">
+        <div className="bg-white/95 rounded-3xl p-8 md:p-10 max-w-md w-full shadow-2xl border border-[#ebdcd0] text-center space-y-6">
           <div className="w-16 h-16 rounded-full bg-coquette-pinkLight text-coquette-pinkDeep mx-auto flex items-center justify-center shadow-inner">
             <span className="text-3xl">🔐</span>
           </div>
@@ -269,10 +283,11 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onBackToPresentation }) 
 
           <button
             onClick={handleSave}
-            className="px-5 py-2 rounded-full bg-coquette-pinkDeep text-white font-bold text-xs hover:bg-coquette-roseDark transition-all flex items-center gap-1.5 shadow-md hover:scale-105"
+            disabled={isSaving}
+            className="px-5 py-2 rounded-full bg-coquette-pinkDeep text-white font-bold text-xs hover:bg-coquette-roseDark transition-all flex items-center gap-1.5 shadow-md hover:scale-105 disabled:opacity-50"
           >
             <Save className="w-4 h-4" />
-            <span>Save All Changes</span>
+            <span>{isSaving ? 'Saving...' : 'Save All Changes'}</span>
           </button>
 
           <button
@@ -328,14 +343,14 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onBackToPresentation }) 
       </nav>
 
       {/* Main Tab Content Editor Card */}
-      <main className="bg-white/95 rounded-2xl p-6 md:p-10 shadow-xl border border border-[#ebdcd0]">
+      <main className="bg-white/95 rounded-2xl p-6 md:p-10 shadow-xl border border-[#ebdcd0]">
 
         {/* ─── TAB 0: Cover Slide ─── */}
         {activeTab === 0 && (
           <div className="space-y-6">
             <h2 className="font-cormorant text-2xl font-bold text-coquette-pinkDeep border-b pb-2 flex items-center justify-between">
               <span>Slide 1: Cover Page Setup 🎀</span>
-              <span className="text-xs font-sans font-normal text-coquette-roseDark/60">Page Tag: {formData.page1Tag || '/01'}</span>
+              <span className="text-xs font-sans font-normal text-coquette-roseDark/60">Page Tag: {formData.page1Tag ?? '/01'}</span>
             </h2>
             
             <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
@@ -345,7 +360,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onBackToPresentation }) 
                 </label>
                 <input
                   type="text"
-                  value={formData.page1Tag || '/01'}
+                  value={formData.page1Tag ?? ''}
                   onChange={(e) => setFormData({ ...formData, page1Tag: e.target.value })}
                   className="w-full px-4 py-2.5 rounded-xl border border-coquette-pink/50 bg-[#fffdf9] font-mono text-sm"
                   placeholder="/01"
@@ -358,7 +373,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onBackToPresentation }) 
                 </label>
                 <input
                   type="text"
-                  value={formData.coverGreeting || 'Happy Birthday'}
+                  value={formData.coverGreeting ?? ''}
                   onChange={(e) => setFormData({ ...formData, coverGreeting: e.target.value })}
                   className="w-full px-4 py-2.5 rounded-xl border border-coquette-pink/50 bg-[#fffdf9] font-alex text-xl"
                   placeholder="Happy Birthday"
@@ -371,7 +386,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onBackToPresentation }) 
                 </label>
                 <input
                   type="text"
-                  value={formData.name}
+                  value={formData.name ?? ''}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                   className="w-full px-4 py-2.5 rounded-xl border border-coquette-pink/50 bg-[#fffdf9] focus:outline-none focus:ring-2 focus:ring-coquette-pinkDeep font-script text-xl"
                   placeholder="e.g. Bestie / Riya"
@@ -384,7 +399,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onBackToPresentation }) 
                 </label>
                 <input
                   type="text"
-                  value={formData.subtitle}
+                  value={formData.subtitle ?? ''}
                   onChange={(e) => setFormData({ ...formData, subtitle: e.target.value })}
                   className="w-full px-4 py-2.5 rounded-xl border border-coquette-pink/50 bg-[#fffdf9] focus:outline-none focus:ring-2 focus:ring-coquette-pinkDeep font-sans text-sm"
                   placeholder="e.g. Aesthetic Birthday Deck"
@@ -399,7 +414,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onBackToPresentation }) 
                 </label>
                 <textarea
                   rows={2}
-                  value={formData.openingLine}
+                  value={formData.openingLine ?? ''}
                   onChange={(e) => setFormData({ ...formData, openingLine: e.target.value })}
                   className="w-full px-4 py-3 rounded-xl border border-coquette-pink/50 bg-[#fffdf9] focus:outline-none focus:ring-2 focus:ring-coquette-pinkDeep font-cormorant text-lg italic"
                   placeholder="Opening dramatic line..."
@@ -412,7 +427,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onBackToPresentation }) 
                 </label>
                 <input
                   type="text"
-                  value={formData.slide1BtnText || 'Begin Her Story 🎀'}
+                  value={formData.slide1BtnText ?? ''}
                   onChange={(e) => setFormData({ ...formData, slide1BtnText: e.target.value })}
                   className="w-full px-4 py-3 rounded-xl border border-coquette-pink/50 bg-[#fffdf9] font-sans text-xs font-bold text-coquette-pinkDeep"
                   placeholder="Begin Her Story 🎀"
@@ -427,7 +442,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onBackToPresentation }) 
           <div className="space-y-6">
             <h2 className="font-cormorant text-2xl font-bold text-coquette-pinkDeep border-b pb-2 flex items-center justify-between">
               <span>Slide 2: About Her Details ✨</span>
-              <span className="text-xs font-sans font-normal text-coquette-roseDark/60">Page Tag: {formData.page2Tag || '/02'}</span>
+              <span className="text-xs font-sans font-normal text-coquette-roseDark/60">Page Tag: {formData.page2Tag ?? '/02'}</span>
             </h2>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -437,7 +452,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onBackToPresentation }) 
                 </label>
                 <input
                   type="text"
-                  value={formData.page2Tag || '/02'}
+                  value={formData.page2Tag ?? ''}
                   onChange={(e) => setFormData({ ...formData, page2Tag: e.target.value })}
                   className="w-full px-4 py-2.5 rounded-xl border border-coquette-pink/50 bg-[#fffdf9] font-mono text-sm"
                   placeholder="/02"
@@ -450,7 +465,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onBackToPresentation }) 
                 </label>
                 <input
                   type="text"
-                  value={formData.aboutTag || 'Hi there'}
+                  value={formData.aboutTag ?? ''}
                   onChange={(e) => setFormData({ ...formData, aboutTag: e.target.value })}
                   className="w-full px-4 py-2.5 rounded-xl border border-coquette-pink/50 bg-[#fffdf9] font-alex text-xl"
                   placeholder="Hi there"
@@ -463,9 +478,10 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onBackToPresentation }) 
                 </label>
                 <input
                   type="text"
-                  value={formData.aboutTitle}
+                  value={formData.aboutTitle ?? ''}
                   onChange={(e) => setFormData({ ...formData, aboutTitle: e.target.value })}
                   className="w-full px-4 py-2.5 rounded-xl border border-coquette-pink/50 bg-[#fffdf9] font-script text-xl"
+                  placeholder="About You ✨"
                 />
               </div>
             </div>
@@ -477,9 +493,10 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onBackToPresentation }) 
                 </label>
                 <textarea
                   rows={3}
-                  value={formData.aboutQuote}
+                  value={formData.aboutQuote ?? ''}
                   onChange={(e) => setFormData({ ...formData, aboutQuote: e.target.value })}
                   className="w-full px-4 py-2.5 rounded-xl border border-coquette-pink/50 bg-[#fffdf9] font-cormorant text-base italic"
+                  placeholder="Main highlight quote..."
                 />
               </div>
 
@@ -489,9 +506,10 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onBackToPresentation }) 
                 </label>
                 <textarea
                   rows={3}
-                  value={formData.heartTagQuote}
+                  value={formData.heartTagQuote ?? ''}
                   onChange={(e) => setFormData({ ...formData, heartTagQuote: e.target.value })}
                   className="w-full px-4 py-2.5 rounded-xl border border-coquette-pink/50 bg-[#fffdf9] font-cormorant text-sm italic"
+                  placeholder="Heart circle quote..."
                 />
               </div>
             </div>
@@ -504,16 +522,17 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onBackToPresentation }) 
                 <div className="flex gap-2">
                   <input
                     type="text"
-                    value={formData.vibeLabel || 'Vibe'}
+                    value={formData.vibeLabel ?? ''}
                     onChange={(e) => setFormData({ ...formData, vibeLabel: e.target.value })}
                     className="w-1/3 px-2 py-2 rounded-lg border text-xs font-bold"
                     placeholder="Vibe"
                   />
                   <input
                     type="text"
-                    value={formData.vibe}
+                    value={formData.vibe ?? ''}
                     onChange={(e) => setFormData({ ...formData, vibe: e.target.value })}
                     className="w-2/3 px-3 py-2 rounded-lg border border-coquette-pink/50 text-xs"
+                    placeholder="Vibe text..."
                   />
                 </div>
               </div>
@@ -525,16 +544,17 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onBackToPresentation }) 
                 <div className="flex gap-2">
                   <input
                     type="text"
-                    value={formData.superpowerLabel || 'Superpower'}
+                    value={formData.superpowerLabel ?? ''}
                     onChange={(e) => setFormData({ ...formData, superpowerLabel: e.target.value })}
                     className="w-1/3 px-2 py-2 rounded-lg border text-xs font-bold"
                     placeholder="Superpower"
                   />
                   <input
                     type="text"
-                    value={formData.superpower}
+                    value={formData.superpower ?? ''}
                     onChange={(e) => setFormData({ ...formData, superpower: e.target.value })}
                     className="w-2/3 px-3 py-2 rounded-lg border border-coquette-pink/50 text-xs"
+                    placeholder="Superpower text..."
                   />
                 </div>
               </div>
@@ -546,16 +566,17 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onBackToPresentation }) 
                 <div className="flex gap-2">
                   <input
                     type="text"
-                    value={formData.statusLabel || 'Status'}
+                    value={formData.statusLabel ?? ''}
                     onChange={(e) => setFormData({ ...formData, statusLabel: e.target.value })}
                     className="w-1/3 px-2 py-2 rounded-lg border text-xs font-bold"
                     placeholder="Status"
                   />
                   <input
                     type="text"
-                    value={formData.status}
+                    value={formData.status ?? ''}
                     onChange={(e) => setFormData({ ...formData, status: e.target.value })}
                     className="w-2/3 px-3 py-2 rounded-lg border border-coquette-pink/50 text-xs"
+                    placeholder="Status text..."
                   />
                 </div>
               </div>
@@ -567,7 +588,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onBackToPresentation }) 
               </label>
               <input
                 type="text"
-                value={formData.slide2BtnText || 'View Friendship Stats ✨'}
+                value={formData.slide2BtnText ?? ''}
                 onChange={(e) => setFormData({ ...formData, slide2BtnText: e.target.value })}
                 className="w-full px-4 py-2.5 rounded-xl border border-coquette-pink/50 bg-[#fffdf9] font-sans text-xs font-bold text-coquette-pinkDeep"
                 placeholder="View Friendship Stats ✨"
@@ -581,7 +602,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onBackToPresentation }) 
           <div className="space-y-6">
             <h2 className="font-cormorant text-2xl font-bold text-coquette-pinkDeep border-b pb-2 flex items-center justify-between">
               <span>Slide 3: Friendship Stats 📊</span>
-              <span className="text-xs font-sans font-normal text-coquette-roseDark/60">Page Tag: {formData.page3Tag || '/03'}</span>
+              <span className="text-xs font-sans font-normal text-coquette-roseDark/60">Page Tag: {formData.page3Tag ?? '/03'}</span>
             </h2>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -591,7 +612,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onBackToPresentation }) 
                 </label>
                 <input
                   type="text"
-                  value={formData.page3Tag || '/03'}
+                  value={formData.page3Tag ?? ''}
                   onChange={(e) => setFormData({ ...formData, page3Tag: e.target.value })}
                   className="w-full px-4 py-2.5 rounded-xl border border-coquette-pink/50 font-mono text-sm"
                   placeholder="/03"
@@ -604,7 +625,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onBackToPresentation }) 
                 </label>
                 <input
                   type="text"
-                  value={formData.statsTag || formData.statsTitle}
+                  value={formData.statsTag ?? ''}
                   onChange={(e) => setFormData({ ...formData, statsTag: e.target.value })}
                   className="w-full px-4 py-2.5 rounded-xl border border-coquette-pink/50 font-alex text-xl"
                   placeholder="Friendship stats"
@@ -617,9 +638,10 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onBackToPresentation }) 
                 </label>
                 <input
                   type="text"
-                  value={formData.statsTitle}
+                  value={formData.statsTitle ?? ''}
                   onChange={(e) => setFormData({ ...formData, statsTitle: e.target.value })}
                   className="w-full px-4 py-2.5 rounded-xl border border-coquette-pink/50 font-script text-xl"
+                  placeholder="Friendship stats"
                 />
               </div>
             </div>
@@ -630,9 +652,10 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onBackToPresentation }) 
               </label>
               <input
                 type="text"
-                value={formData.statsSubtitle}
+                value={formData.statsSubtitle ?? ''}
                 onChange={(e) => setFormData({ ...formData, statsSubtitle: e.target.value })}
                 className="w-full px-4 py-2.5 rounded-xl border border-coquette-pink/50 font-cormorant text-sm italic"
+                placeholder="Subtitle quote..."
               />
             </div>
 
@@ -677,7 +700,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onBackToPresentation }) 
                     <div className="flex gap-2">
                       <input
                         type="text"
-                        value={stat.number}
+                        value={stat.number ?? ''}
                         onChange={(e) => {
                           const newStats = [...formData.stats];
                           newStats[idx].number = e.target.value;
@@ -688,7 +711,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onBackToPresentation }) 
                       />
                       <input
                         type="text"
-                        value={stat.label}
+                        value={stat.label ?? ''}
                         onChange={(e) => {
                           const newStats = [...formData.stats];
                           newStats[idx].label = e.target.value;
@@ -702,13 +725,14 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onBackToPresentation }) 
                 ))}
               </div>
             </div>
+
             <div>
               <label className="block text-xs font-bold uppercase tracking-wider text-coquette-roseDark/80 mb-2">
                 Next Slide Button Text
               </label>
               <input
                 type="text"
-                value={formData.slide3BtnText || 'View Instagram Collage 📸'}
+                value={formData.slide3BtnText ?? ''}
                 onChange={(e) => setFormData({ ...formData, slide3BtnText: e.target.value })}
                 className="w-full px-4 py-2.5 rounded-xl border border-coquette-pink/50 bg-[#fffdf9] font-sans text-xs font-bold text-coquette-pinkDeep"
                 placeholder="View Instagram Collage 📸"
@@ -722,7 +746,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onBackToPresentation }) 
           <div className="space-y-6">
             <h2 className="font-cormorant text-2xl font-bold text-coquette-pinkDeep border-b pb-2 flex items-center justify-between">
               <span>Slide 4: Instagram Scrapbook Layout 📸</span>
-              <span className="text-xs font-sans font-normal text-coquette-roseDark/60">Page Tag: {formData.page4Tag || '/04'}</span>
+              <span className="text-xs font-sans font-normal text-coquette-roseDark/60">Page Tag: {formData.page4Tag ?? '/04'}</span>
             </h2>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -732,7 +756,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onBackToPresentation }) 
                 </label>
                 <input
                   type="text"
-                  value={formData.page4Tag || '/04'}
+                  value={formData.page4Tag ?? ''}
                   onChange={(e) => setFormData({ ...formData, page4Tag: e.target.value })}
                   className="w-full px-4 py-2.5 rounded-xl border border-coquette-pink/50 font-mono text-sm"
                   placeholder="/04"
@@ -745,7 +769,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onBackToPresentation }) 
                 </label>
                 <input
                   type="text"
-                  value={formData.instaTag || 'Insta collage'}
+                  value={formData.instaTag ?? ''}
                   onChange={(e) => setFormData({ ...formData, instaTag: e.target.value })}
                   className="w-full px-4 py-2.5 rounded-xl border border-coquette-pink/50 font-alex text-xl"
                   placeholder="Insta collage"
@@ -758,9 +782,10 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onBackToPresentation }) 
                 </label>
                 <input
                   type="text"
-                  value={formData.instaTitle}
+                  value={formData.instaTitle ?? ''}
                   onChange={(e) => setFormData({ ...formData, instaTitle: e.target.value })}
                   className="w-full px-4 py-2.5 rounded-xl border border-coquette-pink/50 font-script text-xl"
+                  placeholder="Happy Bestie Day!"
                 />
               </div>
             </div>
@@ -772,9 +797,10 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onBackToPresentation }) 
                 </label>
                 <textarea
                   rows={2}
-                  value={formData.instaNote}
+                  value={formData.instaNote ?? ''}
                   onChange={(e) => setFormData({ ...formData, instaNote: e.target.value })}
                   className="w-full px-4 py-2.5 rounded-xl border border-coquette-pink/50 font-cormorant text-sm italic"
+                  placeholder="Journal note..."
                 />
               </div>
 
@@ -784,7 +810,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onBackToPresentation }) 
                 </label>
                 <input
                   type="text"
-                  value={formData.instaSignoff || 'Forever BFF!'}
+                  value={formData.instaSignoff ?? ''}
                   onChange={(e) => setFormData({ ...formData, instaSignoff: e.target.value })}
                   className="w-full px-4 py-2.5 rounded-xl border border-coquette-pink/50 font-alex text-xl text-coquette-pinkDeep"
                   placeholder="Forever BFF!"
@@ -799,9 +825,10 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onBackToPresentation }) 
                 </label>
                 <input
                   type="text"
-                  value={formData.igHandle1 || 'bestie.birthday'}
+                  value={formData.igHandle1 ?? ''}
                   onChange={(e) => setFormData({ ...formData, igHandle1: e.target.value })}
                   className="w-full px-3 py-2 rounded-lg border text-xs font-mono font-bold"
+                  placeholder="bestie.birthday"
                 />
               </div>
 
@@ -811,9 +838,10 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onBackToPresentation }) 
                 </label>
                 <input
                   type="text"
-                  value={formData.igHandle2 || 'birthday.queen'}
+                  value={formData.igHandle2 ?? ''}
                   onChange={(e) => setFormData({ ...formData, igHandle2: e.target.value })}
                   className="w-full px-3 py-2 rounded-lg border text-xs font-mono font-bold"
+                  placeholder="birthday.queen"
                 />
               </div>
 
@@ -823,9 +851,10 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onBackToPresentation }) 
                 </label>
                 <input
                   type="text"
-                  value={formData.badge1}
+                  value={formData.badge1 ?? ''}
                   onChange={(e) => setFormData({ ...formData, badge1: e.target.value })}
                   className="w-full px-3 py-2 rounded-lg border text-xs font-sans font-bold"
+                  placeholder="Pill Badge 1"
                 />
               </div>
 
@@ -835,9 +864,10 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onBackToPresentation }) 
                 </label>
                 <input
                   type="text"
-                  value={formData.badge2}
+                  value={formData.badge2 ?? ''}
                   onChange={(e) => setFormData({ ...formData, badge2: e.target.value })}
                   className="w-full px-3 py-2 rounded-lg border text-xs font-sans font-bold"
+                  placeholder="Pill Badge 2"
                 />
               </div>
             </div>
@@ -848,7 +878,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onBackToPresentation }) 
               </label>
               <input
                 type="text"
-                value={formData.slide4BtnText || 'Make A Birthday Wish 🎂'}
+                value={formData.slide4BtnText ?? ''}
                 onChange={(e) => setFormData({ ...formData, slide4BtnText: e.target.value })}
                 className="w-full px-4 py-2.5 rounded-xl border border-coquette-pink/50 bg-[#fffdf9] font-sans text-xs font-bold text-coquette-pinkDeep"
                 placeholder="Make A Birthday Wish 🎂"
@@ -862,7 +892,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onBackToPresentation }) 
           <div className="space-y-6">
             <h2 className="font-cormorant text-2xl font-bold text-coquette-pinkDeep border-b pb-2 flex items-center justify-between">
               <span>Slide 5: Birthday Cake Candle Wish 🎂</span>
-              <span className="text-xs font-sans font-normal text-coquette-roseDark/60">Page Tag: {formData.page5Tag || '/05'}</span>
+              <span className="text-xs font-sans font-normal text-coquette-roseDark/60">Page Tag: {formData.page5Tag ?? '/05'}</span>
             </h2>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -872,7 +902,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onBackToPresentation }) 
                 </label>
                 <input
                   type="text"
-                  value={formData.page5Tag || '/05'}
+                  value={formData.page5Tag ?? ''}
                   onChange={(e) => setFormData({ ...formData, page5Tag: e.target.value })}
                   className="w-full px-4 py-2.5 rounded-xl border border-coquette-pink/50 font-mono text-sm"
                   placeholder="/05"
@@ -885,7 +915,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onBackToPresentation }) 
                 </label>
                 <input
                   type="text"
-                  value={formData.cakeTag || 'Make a wish'}
+                  value={formData.cakeTag ?? ''}
                   onChange={(e) => setFormData({ ...formData, cakeTag: e.target.value })}
                   className="w-full px-4 py-2.5 rounded-xl border border-coquette-pink/50 font-alex text-xl"
                   placeholder="Make a wish"
@@ -898,9 +928,10 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onBackToPresentation }) 
                 </label>
                 <input
                   type="text"
-                  value={formData.cakeTitle}
+                  value={formData.cakeTitle ?? ''}
                   onChange={(e) => setFormData({ ...formData, cakeTitle: e.target.value })}
                   className="w-full px-4 py-2.5 rounded-xl border border-coquette-pink/50 font-script text-xl"
+                  placeholder="Birthday Cake 🎂"
                 />
               </div>
             </div>
@@ -912,9 +943,10 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onBackToPresentation }) 
                 </label>
                 <input
                   type="text"
-                  value={formData.cakeWishPrompt}
+                  value={formData.cakeWishPrompt ?? ''}
                   onChange={(e) => setFormData({ ...formData, cakeWishPrompt: e.target.value })}
                   className="w-full px-4 py-2.5 rounded-xl border border-coquette-pink/50 font-cormorant text-base italic"
+                  placeholder="Candle prompt..."
                 />
               </div>
 
@@ -924,7 +956,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onBackToPresentation }) 
                 </label>
                 <input
                   type="text"
-                  value={formData.cakeBlowBtnText || 'Blow Out Candles 🕯️'}
+                  value={formData.cakeBlowBtnText ?? ''}
                   onChange={(e) => setFormData({ ...formData, cakeBlowBtnText: e.target.value })}
                   className="w-full px-4 py-2.5 rounded-xl border border-coquette-pink/50 font-sans text-xs font-bold"
                   placeholder="Blow Out Candles 🕯️"
@@ -937,7 +969,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onBackToPresentation }) 
                 </label>
                 <input
                   type="text"
-                  value={formData.cakeBlowingBtnText || 'Blowing Candles...'}
+                  value={formData.cakeBlowingBtnText ?? ''}
                   onChange={(e) => setFormData({ ...formData, cakeBlowingBtnText: e.target.value })}
                   className="w-full px-4 py-2.5 rounded-xl border border-coquette-pink/50 font-sans text-xs font-bold"
                   placeholder="Blowing Candles..."
@@ -951,9 +983,10 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onBackToPresentation }) 
               </label>
               <input
                 type="text"
-                value={formData.wishesUnlockedMessage}
+                value={formData.wishesUnlockedMessage ?? ''}
                 onChange={(e) => setFormData({ ...formData, wishesUnlockedMessage: e.target.value })}
                 className="w-full px-4 py-2.5 rounded-xl border border-coquette-pink/50 font-alex text-2xl text-coquette-pinkDeep"
+                placeholder="Wish unlocked message..."
               />
             </div>
 
@@ -963,7 +996,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onBackToPresentation }) 
               </label>
               <input
                 type="text"
-                value={formData.slide5BtnText || 'Explore Photo Memories 🖼️'}
+                value={formData.slide5BtnText ?? ''}
                 onChange={(e) => setFormData({ ...formData, slide5BtnText: e.target.value })}
                 className="w-full px-4 py-2.5 rounded-xl border border-coquette-pink/50 bg-[#fffdf9] font-sans text-xs font-bold text-coquette-pinkDeep"
                 placeholder="Explore Photo Memories 🖼️"
@@ -977,7 +1010,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onBackToPresentation }) 
           <div className="space-y-6">
             <h2 className="font-cormorant text-2xl font-bold text-coquette-pinkDeep border-b pb-2 flex items-center justify-between">
               <span>Slide 6 & All Photo Slots Manager 🖼️</span>
-              <span className="text-xs font-sans font-normal text-coquette-roseDark/60">Page Tag: {formData.page6Tag || '/06'}</span>
+              <span className="text-xs font-sans font-normal text-coquette-roseDark/60">Page Tag: {formData.page6Tag ?? '/06'}</span>
             </h2>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -987,7 +1020,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onBackToPresentation }) 
                 </label>
                 <input
                   type="text"
-                  value={formData.page6Tag || '/06'}
+                  value={formData.page6Tag ?? ''}
                   onChange={(e) => setFormData({ ...formData, page6Tag: e.target.value })}
                   className="w-full px-4 py-2.5 rounded-xl border border-coquette-pink/50 font-mono text-sm"
                   placeholder="/06"
@@ -1000,7 +1033,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onBackToPresentation }) 
                 </label>
                 <input
                   type="text"
-                  value={formData.photosTag || 'Favorite moments'}
+                  value={formData.photosTag ?? ''}
                   onChange={(e) => setFormData({ ...formData, photosTag: e.target.value })}
                   className="w-full px-4 py-2.5 rounded-xl border border-coquette-pink/50 font-alex text-xl"
                   placeholder="Favorite moments"
@@ -1083,7 +1116,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onBackToPresentation }) 
                         <label className="block text-[10px] font-bold uppercase text-coquette-roseDark/70 mb-1">Photo URL / Path</label>
                         <input
                           type="text"
-                          value={photo.url}
+                          value={photo.url ?? ''}
                           onChange={(e) => {
                             const updated = [...formData.photos];
                             updated[pIdx].url = e.target.value;
@@ -1104,7 +1137,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onBackToPresentation }) 
                       </label>
                       <input
                         type="text"
-                        value={photo.memoryTitle || ''}
+                        value={photo.memoryTitle ?? ''}
                         onChange={(e) => {
                           const updated = [...formData.photos];
                           updated[pIdx].memoryTitle = e.target.value;
@@ -1121,7 +1154,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onBackToPresentation }) 
                       </label>
                       <input
                         type="text"
-                        value={photo.caption || ''}
+                        value={photo.caption ?? ''}
                         onChange={(e) => {
                           const updated = [...formData.photos];
                           updated[pIdx].caption = e.target.value;
@@ -1138,7 +1171,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onBackToPresentation }) 
                       </label>
                       <textarea
                         rows={2}
-                        value={photo.secretNote || ''}
+                        value={photo.secretNote ?? ''}
                         onChange={(e) => {
                           const updated = [...formData.photos];
                           updated[pIdx].secretNote = e.target.value;
@@ -1159,7 +1192,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onBackToPresentation }) 
               </label>
               <input
                 type="text"
-                value={formData.slide6BtnText || 'Read Heartfelt Postcard 💌'}
+                value={formData.slide6BtnText ?? ''}
                 onChange={(e) => setFormData({ ...formData, slide6BtnText: e.target.value })}
                 className="w-full px-4 py-2.5 rounded-xl border border-coquette-pink/50 bg-[#fffdf9] font-sans text-xs font-bold text-coquette-pinkDeep"
                 placeholder="Read Heartfelt Postcard 💌"
@@ -1173,7 +1206,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onBackToPresentation }) 
           <div className="space-y-6">
             <h2 className="font-cormorant text-2xl font-bold text-coquette-pinkDeep border-b pb-2 flex items-center justify-between">
               <span>Slide 7: Heartfelt Postcard Letter 💌</span>
-              <span className="text-xs font-sans font-normal text-coquette-roseDark/60">Page Tag: {formData.page7Tag || '/07'}</span>
+              <span className="text-xs font-sans font-normal text-coquette-roseDark/60">Page Tag: {formData.page7Tag ?? '/07'}</span>
             </h2>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -1183,7 +1216,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onBackToPresentation }) 
                 </label>
                 <input
                   type="text"
-                  value={formData.page7Tag || '/07'}
+                  value={formData.page7Tag ?? ''}
                   onChange={(e) => setFormData({ ...formData, page7Tag: e.target.value })}
                   className="w-full px-4 py-2.5 rounded-xl border border-coquette-pink/50 font-mono text-sm"
                   placeholder="/07"
@@ -1196,7 +1229,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onBackToPresentation }) 
                 </label>
                 <input
                   type="text"
-                  value={formData.letterTag || 'Postcard letter'}
+                  value={formData.letterTag ?? ''}
                   onChange={(e) => setFormData({ ...formData, letterTag: e.target.value })}
                   className="w-full px-4 py-2.5 rounded-xl border border-coquette-pink/50 font-alex text-xl"
                   placeholder="Postcard letter"
@@ -1209,12 +1242,13 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onBackToPresentation }) 
                 </label>
                 <input
                   type="text"
-                  value={formData.letter.salutation}
+                  value={formData.letter.salutation ?? ''}
                   onChange={(e) => setFormData({
                     ...formData,
                     letter: { ...formData.letter, salutation: e.target.value }
                   })}
                   className="w-full px-4 py-2.5 rounded-xl border border-coquette-pink/50 font-cormorant text-lg font-bold"
+                  placeholder="TO. BESTIE"
                 />
               </div>
             </div>
@@ -1226,7 +1260,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onBackToPresentation }) 
                 </label>
                 <input
                   type="text"
-                  value={formData.letterBadge || `A Letter For ${formData.name} 💌`}
+                  value={formData.letterBadge ?? ''}
                   onChange={(e) => setFormData({ ...formData, letterBadge: e.target.value })}
                   className="w-full px-4 py-2.5 rounded-xl border border-coquette-pink/50 font-cormorant text-xs uppercase"
                   placeholder="A Letter For Bestie 💌"
@@ -1239,7 +1273,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onBackToPresentation }) 
                 </label>
                 <input
                   type="text"
-                  value={formData.letterOpenBtnText || 'Open Postcard Letter 💌'}
+                  value={formData.letterOpenBtnText ?? ''}
                   onChange={(e) => setFormData({ ...formData, letterOpenBtnText: e.target.value })}
                   className="w-full px-4 py-2.5 rounded-xl border border-coquette-pink/50 font-sans text-xs font-bold"
                   placeholder="Open Postcard Letter 💌"
@@ -1252,7 +1286,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onBackToPresentation }) 
                 </label>
                 <input
                   type="text"
-                  value={formData.slide7BtnText || 'Final Celebration 🎉'}
+                  value={formData.slide7BtnText ?? ''}
                   onChange={(e) => setFormData({ ...formData, slide7BtnText: e.target.value })}
                   className="w-full px-4 py-2.5 rounded-xl border border-coquette-pink/50 bg-[#fffdf9] font-sans text-xs font-bold text-coquette-pinkDeep"
                   placeholder="Final Celebration 🎉"
@@ -1267,7 +1301,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onBackToPresentation }) 
               <div className="flex gap-2">
                 <input
                   type="text"
-                  value={formData.letter.closing}
+                  value={formData.letter.closing ?? ''}
                   onChange={(e) => setFormData({
                     ...formData,
                     letter: { ...formData.letter, closing: e.target.value }
@@ -1277,7 +1311,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onBackToPresentation }) 
                 />
                 <input
                   type="text"
-                  value={formData.letter.sender}
+                  value={formData.letter.sender ?? ''}
                   onChange={(e) => setFormData({
                     ...formData,
                     letter: { ...formData.letter, sender: e.target.value }
@@ -1317,7 +1351,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onBackToPresentation }) 
                   <span className="font-bold text-xs text-coquette-pinkDeep pt-3">#{idx + 1}</span>
                   <textarea
                     rows={3}
-                    value={para}
+                    value={para ?? ''}
                     onChange={(e) => {
                       const updatedParas = [...formData.letter.paragraphs];
                       updatedParas[idx] = e.target.value;
@@ -1327,6 +1361,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onBackToPresentation }) 
                       });
                     }}
                     className="flex-1 px-4 py-2.5 rounded-xl border border-coquette-pink/50 font-cormorant text-base leading-relaxed italic bg-[#fffdf9]"
+                    placeholder="Enter paragraph text..."
                   />
                   <button
                     onClick={() => {
@@ -1352,7 +1387,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onBackToPresentation }) 
           <div className="space-y-6">
             <h2 className="font-cormorant text-2xl font-bold text-coquette-pinkDeep border-b pb-2 flex items-center justify-between">
               <span>Slide 8: Song Track & Final Celebration 🎵</span>
-              <span className="text-xs font-sans font-normal text-coquette-roseDark/60">Page Tag: {formData.page8Tag || '/08'}</span>
+              <span className="text-xs font-sans font-normal text-coquette-roseDark/60">Page Tag: {formData.page8Tag ?? '/08'}</span>
             </h2>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -1362,7 +1397,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onBackToPresentation }) 
                 </label>
                 <input
                   type="text"
-                  value={formData.page8Tag || '/08'}
+                  value={formData.page8Tag ?? ''}
                   onChange={(e) => setFormData({ ...formData, page8Tag: e.target.value })}
                   className="w-full px-4 py-2.5 rounded-xl border border-coquette-pink/50 font-mono text-sm"
                   placeholder="/08"
@@ -1375,7 +1410,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onBackToPresentation }) 
                 </label>
                 <input
                   type="text"
-                  value={formData.thankYouTag || 'Thank you'}
+                  value={formData.thankYouTag ?? ''}
                   onChange={(e) => setFormData({ ...formData, thankYouTag: e.target.value })}
                   className="w-full px-4 py-2.5 rounded-xl border border-coquette-pink/50 font-alex text-xl"
                   placeholder="Thank you"
@@ -1396,7 +1431,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onBackToPresentation }) 
                   </label>
                   <input
                     type="text"
-                    value={formData.customTrackName || ''}
+                    value={formData.customTrackName ?? ''}
                     onChange={(e) => setFormData({ ...formData, customTrackName: e.target.value })}
                     className="w-full px-4 py-2.5 rounded-xl border font-sans text-sm"
                     placeholder="e.g. Majboor — Autotune Version"
@@ -1409,7 +1444,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onBackToPresentation }) 
                   </label>
                   <input
                     type="text"
-                    value={formData.songSubtext || 'Cinematic Birthday Vibe'}
+                    value={formData.songSubtext ?? ''}
                     onChange={(e) => setFormData({ ...formData, songSubtext: e.target.value })}
                     className="w-full px-4 py-2.5 rounded-xl border font-sans text-xs"
                     placeholder="Cinematic Birthday Vibe"
@@ -1445,9 +1480,10 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onBackToPresentation }) 
                 </label>
                 <input
                   type="text"
-                  value={formData.thankYouTitle}
+                  value={formData.thankYouTitle ?? ''}
                   onChange={(e) => setFormData({ ...formData, thankYouTitle: e.target.value })}
                   className="w-full px-4 py-2.5 rounded-xl border font-script text-2xl"
+                  placeholder="Happy Birthday!"
                 />
               </div>
 
@@ -1457,9 +1493,10 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onBackToPresentation }) 
                 </label>
                 <textarea
                   rows={2}
-                  value={formData.thankYouMessage}
+                  value={formData.thankYouMessage ?? ''}
                   onChange={(e) => setFormData({ ...formData, thankYouMessage: e.target.value })}
                   className="w-full px-4 py-2.5 rounded-xl border font-cormorant text-base italic"
+                  placeholder="Final message..."
                 />
               </div>
 
@@ -1469,7 +1506,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onBackToPresentation }) 
                 </label>
                 <input
                   type="text"
-                  value={formData.slide8BtnText || 'Back to Start 🌸'}
+                  value={formData.slide8BtnText ?? ''}
                   onChange={(e) => setFormData({ ...formData, slide8BtnText: e.target.value })}
                   className="w-full px-4 py-2.5 rounded-xl border font-sans text-xs font-bold text-coquette-pinkDeep"
                   placeholder="Back to Start 🌸"
@@ -1491,10 +1528,11 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onBackToPresentation }) 
 
           <button
             onClick={handleSave}
-            className="px-8 py-3 rounded-full bg-coquette-pinkDeep text-white font-bold text-xs hover:bg-coquette-roseDark transition-all shadow-lg hover:scale-105 flex items-center gap-2"
+            disabled={isSaving}
+            className="px-8 py-3 rounded-full bg-coquette-pinkDeep text-white font-bold text-xs hover:bg-coquette-roseDark transition-all shadow-lg hover:scale-105 flex items-center gap-2 disabled:opacity-50"
           >
             <Save className="w-4 h-4" />
-            <span>Save All Changes</span>
+            <span>{isSaving ? 'Saving...' : 'Save All Changes'}</span>
           </button>
 
           <button
