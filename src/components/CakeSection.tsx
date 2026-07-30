@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import confetti from 'canvas-confetti';
-import { birthdayConfig } from '../config/birthdayConfig';
+import { useConfig } from '../context/ConfigContext';
 import { soundEngine } from '../utils/audioSynth';
 
 interface CakeSectionProps {
@@ -9,6 +9,7 @@ interface CakeSectionProps {
 }
 
 export const CakeSection: React.FC<CakeSectionProps> = ({ onWishBlown }) => {
+  const { config } = useConfig();
   const [isBlown, setIsBlown] = useState(false);
   const [isBlowing, setIsBlowing] = useState(false);
 
@@ -227,7 +228,7 @@ export const CakeSection: React.FC<CakeSectionProps> = ({ onWishBlown }) => {
                   ✨ Wish Unlocked ✨
                 </p>
                 <p className="font-elegant text-lg text-warm-200/60 italic max-w-sm mx-auto">
-                  {birthdayConfig.wishesUnlockedMessage}
+                  {config.wishesUnlockedMessage}
                 </p>
               </motion.div>
             )}

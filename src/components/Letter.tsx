@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { birthdayConfig } from '../config/birthdayConfig';
+import { useConfig } from '../context/ConfigContext';
 import { soundEngine } from '../utils/audioSynth';
 
 export const Letter: React.FC = () => {
+  const { config } = useConfig();
   const [isOpen, setIsOpen] = useState(false);
   const [showContent, setShowContent] = useState(false);
 
@@ -14,7 +15,7 @@ export const Letter: React.FC = () => {
     setTimeout(() => setShowContent(true), 600);
   };
 
-  const { letter } = birthdayConfig;
+  const { letter } = config;
 
   return (
     <section className="relative py-28 md:py-44 overflow-hidden">

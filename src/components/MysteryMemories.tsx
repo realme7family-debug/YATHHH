@@ -1,9 +1,11 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { birthdayConfig, PhotoItem } from '../config/birthdayConfig';
+import { PhotoItem } from '../config/birthdayConfig';
+import { useConfig } from '../context/ConfigContext';
 import { soundEngine } from '../utils/audioSynth';
 
 export const MysteryMemories: React.FC = () => {
+  const { config } = useConfig();
   const [unlockedIds, setUnlockedIds] = useState<Set<string>>(new Set());
   const [selectedPhoto, setSelectedPhoto] = useState<PhotoItem | null>(null);
 
@@ -46,8 +48,8 @@ export const MysteryMemories: React.FC = () => {
 
           {/* Progress Indicator */}
           <div className="mt-6 inline-flex items-center gap-2 px-5 py-2 rounded-full border border-warm-400/20 bg-dark-900/60 text-xs font-sans tracking-widest text-warm-200/70 uppercase">
-            <span>Unlocked {unlockedIds.size} of {birthdayConfig.photos.length} Memories</span>
-            {unlockedIds.size === birthdayConfig.photos.length && (
+            <span>Unlocked {unlockedIds.size} of {config.photos.length} Memories</span>
+            {unlockedIds.size === config.photos.length && (
               <span className="text-amber-400">✨ All Revealed!</span>
             )}
           </div>
@@ -55,7 +57,7 @@ export const MysteryMemories: React.FC = () => {
 
         {/* Mystery Cards Grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-          {birthdayConfig.photos.map((photo, index) => {
+          {config.photos.map((photo, index) => {
             const isUnlocked = unlockedIds.has(photo.id);
 
             return (

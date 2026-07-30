@@ -200,7 +200,33 @@ export const birthdayConfig = ${JSON.stringify(config, null, 2)};
       exportTSConfig,
       importConfig
     }}>
-      {children}
+      {isLoading ? (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 9999,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            background: '#0f0d0b',
+          }}
+        >
+          <div
+            style={{
+              width: 40,
+              height: 40,
+              borderRadius: '50%',
+              border: '2px solid rgba(196, 164, 132, 0.15)',
+              borderTopColor: 'rgba(196, 164, 132, 0.6)',
+              animation: 'configSpin 0.8s linear infinite',
+            }}
+          />
+          <style>{`@keyframes configSpin { to { transform: rotate(360deg); } }`}</style>
+        </div>
+      ) : (
+        children
+      )}
     </ConfigContext.Provider>
   );
 };

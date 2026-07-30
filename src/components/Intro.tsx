@@ -1,6 +1,6 @@
 import React from 'react';
 import { motion } from 'framer-motion';
-import { birthdayConfig } from '../config/birthdayConfig';
+import { useConfig } from '../context/ConfigContext';
 import { soundEngine } from '../utils/audioSynth';
 
 interface IntroProps {
@@ -8,6 +8,7 @@ interface IntroProps {
 }
 
 export const Intro: React.FC<IntroProps> = ({ onEnter }) => {
+  const { config } = useConfig();
   const handleEnter = () => {
     soundEngine.playChime();
     onEnter();
@@ -65,7 +66,7 @@ export const Intro: React.FC<IntroProps> = ({ onEnter }) => {
           transition={{ duration: 1.2, delay: 0.6 }}
           className="font-elegant text-xl md:text-2xl text-warm-200/70 italic tracking-wide mb-6"
         >
-          {birthdayConfig.openingLine}
+          {config.openingLine}
         </motion.p>
 
         {/* Name — dramatic reveal */}
@@ -84,7 +85,7 @@ export const Intro: React.FC<IntroProps> = ({ onEnter }) => {
           transition={{ duration: 1, delay: 2 }}
           className="font-display text-2xl md:text-3xl italic text-warm-200/50 mb-14"
         >
-          {birthdayConfig.name}
+          {config.name}
         </motion.p>
 
         {/* Enter button — elegant, minimal */}

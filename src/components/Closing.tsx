@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import confetti from 'canvas-confetti';
-import { birthdayConfig } from '../config/birthdayConfig';
+import { useConfig } from '../context/ConfigContext';
 import { soundEngine } from '../utils/audioSynth';
 
 export const Closing: React.FC = () => {
+  const { config } = useConfig();
   const [celebrated, setCelebrated] = useState(false);
 
   const handleCelebrate = () => {
@@ -67,7 +68,7 @@ export const Closing: React.FC = () => {
           <div className="elegant-divider mb-10" />
 
           <p className="font-elegant text-xl md:text-2xl text-warm-200/25 italic mb-16 leading-relaxed">
-            "{birthdayConfig.quotes[2]}"
+            "{config.quotes[2]}"
           </p>
 
           <h2 className="font-display text-4xl md:text-6xl font-medium gold-gradient-text leading-tight mb-4">
@@ -115,7 +116,7 @@ export const Closing: React.FC = () => {
         >
           <div className="elegant-divider mb-6" />
           <p className="font-sans text-xs text-warm-200/15 tracking-[0.2em] uppercase">
-            Made with love — {birthdayConfig.name}'s Birthday
+            Made with love — {config.name}'s Birthday
           </p>
         </motion.div>
       </div>

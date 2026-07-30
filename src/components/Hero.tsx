@@ -1,8 +1,9 @@
 import React from 'react';
 import { motion } from 'framer-motion';
-import { birthdayConfig } from '../config/birthdayConfig';
+import { useConfig } from '../context/ConfigContext';
 
 export const Hero: React.FC = () => {
+  const { config } = useConfig();
   return (
     <section className="relative min-h-screen flex items-center justify-center overflow-hidden">
       {/* Dark ambient background */}
@@ -29,7 +30,7 @@ export const Hero: React.FC = () => {
           transition={{ duration: 1.2, delay: 0.5 }}
           className="font-elegant text-lg md:text-xl text-warm-200/40 italic mb-10 tracking-wide"
         >
-          "{birthdayConfig.quotes[0]}"
+          "{config.quotes[0]}"
         </motion.p>
 
         {/* Main heading */}

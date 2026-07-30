@@ -4,6 +4,7 @@ import confetti from 'canvas-confetti';
 import { useConfig } from '../context/ConfigContext';
 import { PhotoItem } from '../config/birthdayConfig';
 import { soundEngine } from '../utils/audioSynth';
+import { IntroSplash } from './IntroSplash';
 import { 
   Sparkles, Music, VolumeX, Heart, Gift, Camera, ChevronRight, ChevronLeft, 
   Upload, Star, MessageCircle, Bookmark, Send, UserPlus, Settings, RotateCcw,
@@ -170,6 +171,7 @@ export const AestheticPresentation: React.FC<PresentationProps> = ({ onOpenAdmin
   const [selectedPhoto, setSelectedPhoto] = useState<PhotoItem | null>(null);
   const [isPlayingMusic, setIsPlayingMusic] = useState(false);
   const [customTrackName, setCustomTrackName] = useState(config.customTrackName || "Majboor — Cinematic Version");
+  const [showIntroSplash, setShowIntroSplash] = useState(true);
 
   const totalSlides = 8;
 
@@ -306,7 +308,13 @@ export const AestheticPresentation: React.FC<PresentationProps> = ({ onOpenAdmin
   ];
 
   return (
-    <div className="min-h-screen py-6 md:py-10 px-4 md:px-8 max-w-4xl mx-auto flex flex-col justify-between items-center relative font-sans">
+    <>
+      <AnimatePresence>
+        {showIntroSplash && (
+          <IntroSplash onComplete={() => setShowIntroSplash(false)} />
+        )}
+      </AnimatePresence>
+      <div className="min-h-screen py-6 md:py-10 px-4 md:px-8 max-w-4xl mx-auto flex flex-col justify-between items-center relative font-sans">
       
       {/* Top Slide Counter & Audio Bar */}
       <div className="w-full flex justify-between items-center mb-3 px-2">
@@ -1052,5 +1060,6 @@ export const AestheticPresentation: React.FC<PresentationProps> = ({ onOpenAdmin
       </AnimatePresence>
 
     </div>
+    </>
   );
 };
