@@ -6,8 +6,8 @@ const COLLECTION_NAME = 'config';
 const MEDIA_COLLECTION = 'media';
 
 // Primary Single Source of Truth Global Cloud Database Endpoint
-const GLOBAL_CLOUD_DB_BASE = 'https://crudcrud.com/api/318219a1537140e8a665fc86f1610e59/config';
-const GLOBAL_CLOUD_DOC_ID = '6a6b7a6280807903e8b0e435';
+const GLOBAL_CLOUD_DB_BASE = 'https://crudcrud.com/api/0ac992c15d2b480a8a101dd63b738841/config';
+const GLOBAL_CLOUD_DOC_ID = '6a6b7e5e80807903e8b0e462';
 const GLOBAL_CLOUD_DOC_URL = `${GLOBAL_CLOUD_DB_BASE}/${GLOBAL_CLOUD_DOC_ID}`;
 
 // Global cache for MongoDB serverless connection
