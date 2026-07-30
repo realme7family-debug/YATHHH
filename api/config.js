@@ -12,6 +12,26 @@ const getSupabaseHeaders = () => ({
   'Expires': '0',
 });
 
+async function parseRequestBody(req) {
+  if (req.body) {
+    if (typeof req.body === 'object') return req.body;
+    if (typeof req.body === 'string') {
+      try { return JSON.parse(req.body); } catch (e) {}
+    }
+  }
+  return new Promise((resolve) => {
+    let bodyData = '';
+    req.on('data', (chunk) => { bodyData += chunk; });
+    req.on('end', () => {
+      try {
+        resolve(JSON.parse(bodyData));
+      } catch (e) {
+        resolve({});
+      }
+    });
+  });
+}
+
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
@@ -39,25 +59,26 @@ export default async function handler(req, res) {
           const rows = await response.json();
           if (Array.isArray(rows) && rows.length > 0) {
             const data = rows[0].data || rows[0].config || rows[0];
-            if (data && typeof data === 'object') {
+            if (data && typeof data === 'object' && Object.keys(data).length > 0) {
               return res.status(200).json({ success: true, data });
             }
           }
         }
       } catch (err) {
-        console.warn('GET Supabase DB fetch warning:', err);
+        console.warn('GET Supabase DB warning:', err);
       }
 
-      return res.status(200).json({ success: false, error: 'Database record not found' });
+      return res.status(200).json({ success: false, error: 'Database document not found' });
     }
 
     if (method === 'POST' || method === 'PUT' || method === 'PATCH') {
-      let body = req.body;
-      if (typeof body === 'string') {
-        try { body = JSON.parse(body); } catch (e) {}
-      }
+      const body = await parseRequestBody(req);
       const payload = body?.config || body;
       const { _id, ...cleanPayload } = payload || {};
+
+      if (!cleanPayload || Object.keys(cleanPayload).length === 0) {
+        return res.status(400).json({ success: false, error: 'Payload body is empty' });
+      }
 
       try {
         const upsertRes = await fetch(`${SUPABASE_BASE_URL}/${TABLE_NAME}`, {
@@ -77,12 +98,15 @@ export default async function handler(req, res) {
           const rows = await upsertRes.json();
           const savedData = (Array.isArray(rows) && rows[0]?.data) ? rows[0].data : cleanPayload;
           return res.status(200).json({ success: true, data: savedData });
+        } else {
+          const errorText = await upsertRes.text();
+          console.error('Supabase DB save error:', upsertRes.status, errorText);
+          return res.status(500).json({ success: false, error: errorText });
         }
       } catch (cloudErr) {
-        console.warn('Supabase DB save warning:', cloudErr);
+        console.error('Supabase DB exception:', cloudErr);
+        return res.status(500).json({ success: false, error: cloudErr.message });
       }
-
-      return res.status(200).json({ success: true, data: cleanPayload });
     }
 
     if (method === 'DELETE') {
