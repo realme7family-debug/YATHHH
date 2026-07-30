@@ -45,15 +45,19 @@ export const ConfigProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   };
 
   /**
-   * Refetch latest config from Supabase / Database (loaded ONCE)
+   * Refetch latest config from Single Source of Truth Production Database API
    */
   const refetchConfig = useCallback(async () => {
-    setIsLoading(true);
     try {
       const dbData = await getDatabaseConfig();
       if (dbData) {
         const formatted = formatConfig(dbData);
-        setConfig(formatted);
+        setConfig(prevConfig => {
+          if (JSON.stringify(prevConfig) === JSON.stringify(formatted)) {
+            return prevConfig;
+          }
+          return formatted;
+        });
         setError(null);
       }
     } catch (e: any) {
@@ -64,13 +68,37 @@ export const ConfigProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }
   }, []);
 
-  // Fetch data ONCE on mount. No polling intervals or auto-refetch loops that reset form state!
+  // Fetch initial data & set up global background sync across all devices
   useEffect(() => {
     refetchConfig();
+
+    // Polling interval every 5 seconds for live global synchronization across all connected devices
+    const intervalId = setInterval(() => {
+      refetchConfig();
+    }, 5000);
+
+    // Immediate refetch when window or tab regains focus
+    const handleFocus = () => {
+      refetchConfig();
+    };
+
+    window.addEventListener('focus', handleFocus);
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        refetchConfig();
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibility);
+
+    return () => {
+      clearInterval(intervalId);
+      window.removeEventListener('focus', handleFocus);
+      document.removeEventListener('visibilitychange', handleVisibility);
+    };
   }, [refetchConfig]);
 
   /**
-   * Save updated configuration to Database / Supabase
+   * Save updated configuration to Production Database
    */
   const updateConfig = async (newConfig: BirthdayConfigType): Promise<boolean> => {
     setIsSaving(true);

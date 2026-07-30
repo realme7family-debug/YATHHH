@@ -1,12 +1,10 @@
 import { birthdayConfig, BirthdayConfigType } from '../config/birthdayConfig';
 
-// Supabase API Credentials
+// Supabase API Credentials - Primary Single Source of Truth
 const SUPABASE_BASE_URL = 'https://njfafjfosrdahwamncus.supabase.co/rest/v1';
 const SUPABASE_API_KEY = 'sb_publishable_iV1GPV3oNzXmgLJbyY4WQw_aN0A_ZiX';
 const TABLE_NAME = 'config';
 const DOC_ID = 'production_config';
-
-const LOCAL_STORAGE_KEY = 'yaathh_birthday_config_v1';
 
 // Headers for Supabase REST API
 const getSupabaseHeaders = () => ({
@@ -39,10 +37,29 @@ function mergeConfigSchema(rawData: any): BirthdayConfigType {
 }
 
 /**
- * Fetch latest config from Supabase Database (with local storage backup)
+ * FETCH latest config directly from Single Source of Truth Production Database (Supabase / Backend API)
+ * NO localStorage. NO device-specific memory overrides.
  */
 export async function getDatabaseConfig(): Promise<BirthdayConfigType> {
-  // 1. Try Supabase REST Endpoint first
+  // 1. Try Vercel Serverless /api/config Endpoint (Backend Proxy with zero cache)
+  try {
+    const apiRes = await fetch(`/api/config?t=${Date.now()}`, {
+      method: 'GET',
+      headers: {
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        'Pragma': 'no-cache',
+      },
+      cache: 'no-store',
+    });
+    if (apiRes.ok) {
+      const json = await apiRes.json();
+      if (json.success && json.data) {
+        return mergeConfigSchema(json.data);
+      }
+    }
+  } catch (e) {}
+
+  // 2. Direct Supabase REST fetch
   try {
     const res = await fetch(`${SUPABASE_BASE_URL}/${TABLE_NAME}?id=eq.${DOC_ID}&select=*&t=${Date.now()}`, {
       method: 'GET',
@@ -56,34 +73,20 @@ export async function getDatabaseConfig(): Promise<BirthdayConfigType> {
         const row = rows[0];
         const data = row.data || row.config || row;
         if (data && typeof data === 'object') {
-          const merged = mergeConfigSchema(data);
-          // Sync to localStorage backup
-          try { localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(merged)); } catch (e) {}
-          return merged;
+          return mergeConfigSchema(data);
         }
       }
     }
   } catch (err) {
-    console.warn('Supabase DB fetch warning, attempting fallback storage:', err);
+    console.error('Error fetching config from Production Supabase Database:', err);
   }
 
-  // 2. LocalStorage backup
-  try {
-    const local = localStorage.getItem(LOCAL_STORAGE_KEY);
-    if (local) {
-      const parsed = JSON.parse(local);
-      if (parsed && typeof parsed === 'object') {
-        return mergeConfigSchema(parsed);
-      }
-    }
-  } catch (e) {}
-
-  // 3. Initial Default Schema
+  // 3. Fallback Initial Default Schema
   return { ...birthdayConfig };
 }
 
 /**
- * Save updated config to Supabase Database (and sync local storage)
+ * SAVE updated config directly into Single Source of Truth Production Database (Supabase / Backend API)
  */
 export async function saveDatabaseConfig(newConfig: BirthdayConfigType): Promise<BirthdayConfigType> {
   if (!newConfig || typeof newConfig !== 'object') {
@@ -92,12 +95,26 @@ export async function saveDatabaseConfig(newConfig: BirthdayConfigType): Promise
 
   const cleanConfig = mergeConfigSchema(newConfig);
 
-  // 1. Always save to LocalStorage immediately for instant persistence
+  // 1. Try Vercel Serverless /api/config Endpoint first
   try {
-    localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(cleanConfig));
+    const apiRes = await fetch('/api/config', {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+      },
+      cache: 'no-store',
+      body: JSON.stringify(cleanConfig),
+    });
+    if (apiRes.ok) {
+      const json = await apiRes.json();
+      if (json.success && json.data) {
+        return mergeConfigSchema(json.data);
+      }
+    }
   } catch (e) {}
 
-  // 2. Upsert to Supabase REST API
+  // 2. Direct Supabase REST Upsert
   try {
     const payload = {
       id: DOC_ID,
@@ -105,7 +122,6 @@ export async function saveDatabaseConfig(newConfig: BirthdayConfigType): Promise
       updated_at: new Date().toISOString(),
     };
 
-    // Attempt Upsert (Prefer: resolution=merge-duplicates)
     const upsertRes = await fetch(`${SUPABASE_BASE_URL}/${TABLE_NAME}`, {
       method: 'POST',
       headers: {
@@ -121,39 +137,19 @@ export async function saveDatabaseConfig(newConfig: BirthdayConfigType): Promise
         const savedData = rows[0].data || cleanConfig;
         return mergeConfigSchema(savedData);
       }
-    } else if (upsertRes.status === 404 || upsertRes.status === 400) {
-      // Try PATCH directly if row already exists
-      const patchRes = await fetch(`${SUPABASE_BASE_URL}/${TABLE_NAME}?id=eq.${DOC_ID}`, {
-        method: 'PATCH',
-        headers: {
-          ...getSupabaseHeaders(),
-          'Prefer': 'return=representation',
-        },
-        body: JSON.stringify(payload),
-      });
-
-      if (patchRes.ok) {
-        const rows = await patchRes.json();
-        if (Array.isArray(rows) && rows.length > 0) {
-          return mergeConfigSchema(rows[0].data || cleanConfig);
-        }
-      }
     }
   } catch (err) {
-    console.warn('Supabase DB save warning (saved to persistent local storage):', err);
+    console.error('Error saving config to Production Supabase Database:', err);
   }
 
   return cleanConfig;
 }
 
 /**
- * Reset configuration in Supabase Database to default schema
+ * RESET configuration in Production Database to default schema
  */
 export async function resetDatabaseConfig(): Promise<BirthdayConfigType> {
   const defaultConfig = { ...birthdayConfig };
-  try {
-    localStorage.removeItem(LOCAL_STORAGE_KEY);
-  } catch (e) {}
   return await saveDatabaseConfig(defaultConfig);
 }
 
