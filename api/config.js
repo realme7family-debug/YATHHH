@@ -52,7 +52,6 @@ export default async function handler(req, res) {
         const response = await fetch(`${SUPABASE_BASE_URL}/${TABLE_NAME}?id=eq.${DOC_ID}&select=*`, {
           method: 'GET',
           headers: getSupabaseHeaders(),
-          cache: 'no-store',
         });
 
         if (response.ok) {
