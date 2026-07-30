@@ -12,15 +12,10 @@ interface AdminPanelProps {
 
 export const AdminPanel: React.FC<AdminPanelProps> = ({ onBackToPresentation }) => {
   const { config, updateConfig, resetConfig, exportConfig, importConfig, isSaving, isLoading } = useConfig();
-  const [formData, setFormData] = useState<BirthdayConfigType>(JSON.parse(JSON.stringify(config)));
+  const [formData, setFormData] = useState<BirthdayConfigType>(() => JSON.parse(JSON.stringify(config)));
   const [activeTab, setActiveTab] = useState<number>(0);
   const [savedNotification, setSavedNotification] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState<boolean>(false);
-  
-  // Sync local form state when database config changes
-  React.useEffect(() => {
-    setFormData(JSON.parse(JSON.stringify(config)));
-  }, [config]);
 
   // Password Security Lock State
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {

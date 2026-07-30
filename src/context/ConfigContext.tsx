@@ -61,7 +61,13 @@ export const ConfigProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
       const json = await res.json();
       if (json.success && json.data) {
-        setConfig(formatConfig(json.data));
+        const formatted = formatConfig(json.data);
+        setConfig(prevConfig => {
+          if (JSON.stringify(prevConfig) === JSON.stringify(formatted)) {
+            return prevConfig;
+          }
+          return formatted;
+        });
         setError(null);
       }
     } catch (e: any) {
