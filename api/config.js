@@ -54,23 +54,23 @@ export default async function handler(req, res) {
           headers: getSupabaseHeaders(),
         });
 
+        const status = response.status;
+        const responseText = await response.text();
+
         if (response.ok) {
-          const rows = await response.json();
+          let rows = [];
+          try { rows = JSON.parse(responseText); } catch(e) {}
           if (Array.isArray(rows) && rows.length > 0) {
             const data = rows[0].data || rows[0].config || rows[0];
             if (data && typeof data === 'object' && Object.keys(data).length > 0) {
               return res.status(200).json({ success: true, data });
             }
           }
-        } else {
-          const errText = await response.text();
-          console.error('Supabase GET failed with status:', response.status, errText);
         }
+        return res.status(200).json({ success: false, error: 'Database document not found', status, responseText });
       } catch (err) {
-        console.warn('GET Supabase DB exception:', err);
+        return res.status(500).json({ success: false, error: err.message, stack: err.stack });
       }
-
-      return res.status(200).json({ success: false, error: 'Database document not found' });
     }
 
     if (method === 'POST' || method === 'PUT' || method === 'PATCH') {
