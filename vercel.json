@@ -1,7 +1,7 @@
 {
   "rewrites": [
-    { "source": "/api/config", "destination": "/api/config" },
-    { "source": "/api/upload", "destination": "/api/upload" },
-    { "source": "/(.*)", "destination": "/index.html" }
+    { "source": "/api/config", "destination": "/api/config.js" },
+    { "source": "/api/upload", "destination": "/api/upload.js" },
+    { "source": "/((?!api/).*)", "destination": "/index.html" }
   ]
 }
