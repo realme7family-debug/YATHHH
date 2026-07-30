@@ -36,10 +36,30 @@ function mergeConfigSchema(rawData: any): BirthdayConfigType {
 }
 
 /**
- * FETCH latest config directly from Production Supabase Database
+ * FETCH latest config directly from Production Database (via Vercel API proxy or Supabase REST)
  */
 export async function getDatabaseConfig(): Promise<BirthdayConfigType> {
-  // 1. Direct Supabase REST fetch (Primary)
+  // 1. Primary: Same-Origin Vercel Serverless /api/config API (Bypasses firewall & CORS restrictions)
+  try {
+    const apiRes = await fetch(`/api/config?t=${Date.now()}`, {
+      method: 'GET',
+      headers: {
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        'Pragma': 'no-cache',
+      },
+      cache: 'no-store',
+    });
+    if (apiRes.ok) {
+      const json = await apiRes.json();
+      if (json.success && json.data && typeof json.data === 'object' && Object.keys(json.data).length > 0) {
+        return mergeConfigSchema(json.data);
+      }
+    }
+  } catch (e) {
+    console.warn('Vercel API fetch warning, attempting direct Supabase query:', e);
+  }
+
+  // 2. Secondary: Direct Supabase REST fetch
   try {
     const res = await fetch(`${SUPABASE_BASE_URL}/${TABLE_NAME}?id=eq.${DOC_ID}&select=*&t=${Date.now()}`, {
       method: 'GET',
@@ -58,29 +78,14 @@ export async function getDatabaseConfig(): Promise<BirthdayConfigType> {
       }
     }
   } catch (err) {
-    console.error('Direct Supabase fetch error:', err);
+    console.error('Direct Supabase DB fetch error:', err);
   }
-
-  // 2. Backup to /api/config serverless endpoint
-  try {
-    const apiRes = await fetch(`/api/config?t=${Date.now()}`, {
-      method: 'GET',
-      headers: { 'Cache-Control': 'no-cache, no-store, must-revalidate' },
-      cache: 'no-store',
-    });
-    if (apiRes.ok) {
-      const json = await apiRes.json();
-      if (json.success && json.data && typeof json.data === 'object' && Object.keys(json.data).length > 0) {
-        return mergeConfigSchema(json.data);
-      }
-    }
-  } catch (e) {}
 
   return { ...birthdayConfig };
 }
 
 /**
- * SAVE updated config directly into Production Supabase Database
+ * SAVE updated config directly into Production Database (via Vercel API proxy or Supabase REST)
  */
 export async function saveDatabaseConfig(newConfig: BirthdayConfigType): Promise<BirthdayConfigType> {
   if (!newConfig || typeof newConfig !== 'object') {
@@ -88,37 +93,8 @@ export async function saveDatabaseConfig(newConfig: BirthdayConfigType): Promise
   }
 
   const cleanConfig = mergeConfigSchema(newConfig);
-  const payload = {
-    id: DOC_ID,
-    data: cleanConfig,
-    updated_at: new Date().toISOString(),
-  };
 
-  // 1. Direct Supabase REST Upsert (Primary)
-  try {
-    const upsertRes = await fetch(`${SUPABASE_BASE_URL}/${TABLE_NAME}`, {
-      method: 'POST',
-      headers: {
-        ...getSupabaseHeaders(),
-        'Prefer': 'resolution=merge-duplicates,return=representation',
-      },
-      body: JSON.stringify(payload),
-    });
-
-    if (upsertRes.ok) {
-      const rows = await upsertRes.json();
-      if (Array.isArray(rows) && rows.length > 0) {
-        const savedData = rows[0].data || cleanConfig;
-        return mergeConfigSchema(savedData);
-      }
-    } else {
-      console.warn('Supabase direct POST failed:', upsertRes.status, await upsertRes.text());
-    }
-  } catch (err) {
-    console.error('Direct Supabase DB save error:', err);
-  }
-
-  // 2. Backup to /api/config endpoint
+  // 1. Primary: Same-Origin Vercel Serverless /api/config API
   try {
     const apiRes = await fetch('/api/config', {
       method: 'POST',
@@ -134,8 +110,40 @@ export async function saveDatabaseConfig(newConfig: BirthdayConfigType): Promise
       if (json.success && json.data) {
         return mergeConfigSchema(json.data);
       }
+    } else {
+      console.warn('Vercel API save returned status:', apiRes.status);
     }
-  } catch (e) {}
+  } catch (e) {
+    console.warn('Vercel API save error, attempting direct Supabase POST:', e);
+  }
+
+  // 2. Secondary: Direct Supabase REST Upsert
+  try {
+    const payload = {
+      id: DOC_ID,
+      data: cleanConfig,
+      updated_at: new Date().toISOString(),
+    };
+
+    const upsertRes = await fetch(`${SUPABASE_BASE_URL}/${TABLE_NAME}`, {
+      method: 'POST',
+      headers: {
+        ...getSupabaseHeaders(),
+        'Prefer': 'resolution=merge-duplicates,return=representation',
+      },
+      body: JSON.stringify(payload),
+    });
+
+    if (upsertRes.ok) {
+      const rows = await upsertRes.json();
+      if (Array.isArray(rows) && rows.length > 0) {
+        const savedData = rows[0].data || cleanConfig;
+        return mergeConfigSchema(savedData);
+      }
+    }
+  } catch (err) {
+    console.error('Direct Supabase DB save error:', err);
+  }
 
   return cleanConfig;
 }
