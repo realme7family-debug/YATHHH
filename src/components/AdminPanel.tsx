@@ -16,13 +16,16 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onBackToPresentation }) 
   const [activeTab, setActiveTab] = useState<number>(0);
   const [savedNotification, setSavedNotification] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState<boolean>(false);
-  const isInitializedRef = useRef<boolean>(false);
 
-  // Populate form ONCE when initial database config finishes loading
+  // Sync form state when database config is loaded or updated
+  const lastConfigJsonRef = useRef<string>('');
   React.useEffect(() => {
-    if (!isLoading && !isInitializedRef.current) {
-      setFormData(JSON.parse(JSON.stringify(config)));
-      isInitializedRef.current = true;
+    if (!isLoading && config) {
+      const newConfigJson = JSON.stringify(config);
+      if (newConfigJson !== lastConfigJsonRef.current) {
+        setFormData(JSON.parse(JSON.stringify(config)));
+        lastConfigJsonRef.current = newConfigJson;
+      }
     }
   }, [isLoading, config]);
 
