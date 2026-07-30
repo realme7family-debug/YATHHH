@@ -49,7 +49,7 @@ export default async function handler(req, res) {
 
     if (method === 'GET') {
       try {
-        const response = await fetch(`${SUPABASE_BASE_URL}/${TABLE_NAME}?id=eq.${DOC_ID}&select=*&t=${Date.now()}`, {
+        const response = await fetch(`${SUPABASE_BASE_URL}/${TABLE_NAME}?id=eq.${DOC_ID}&select=*`, {
           method: 'GET',
           headers: getSupabaseHeaders(),
           cache: 'no-store',
@@ -63,9 +63,12 @@ export default async function handler(req, res) {
               return res.status(200).json({ success: true, data });
             }
           }
+        } else {
+          const errText = await response.text();
+          console.error('Supabase GET failed with status:', response.status, errText);
         }
       } catch (err) {
-        console.warn('GET Supabase DB warning:', err);
+        console.warn('GET Supabase DB exception:', err);
       }
 
       return res.status(200).json({ success: false, error: 'Database document not found' });

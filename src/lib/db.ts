@@ -61,7 +61,7 @@ export async function getDatabaseConfig(): Promise<BirthdayConfigType> {
 
   // 2. Secondary: Direct Supabase REST fetch
   try {
-    const res = await fetch(`${SUPABASE_BASE_URL}/${TABLE_NAME}?id=eq.${DOC_ID}&select=*&t=${Date.now()}`, {
+    const res = await fetch(`${SUPABASE_BASE_URL}/${TABLE_NAME}?id=eq.${DOC_ID}&select=*`, {
       method: 'GET',
       headers: getSupabaseHeaders(),
       cache: 'no-store',
