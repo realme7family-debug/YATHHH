@@ -274,14 +274,6 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onBackToPresentation }) 
         {/* Header Action Buttons */}
         <div className="flex flex-wrap items-center gap-2">
           <button
-            onClick={onBackToPresentation}
-            className="px-4 py-2 rounded-full bg-coquette-pinkLight text-coquette-roseDark font-bold text-xs hover:bg-coquette-pink transition-colors flex items-center gap-1.5 shadow-sm"
-          >
-            <Eye className="w-4 h-4" />
-            <span>View Live Deck</span>
-          </button>
-
-          <button
             onClick={handleSave}
             disabled={isSaving}
             className="px-5 py-2 rounded-full bg-coquette-pinkDeep text-white font-bold text-xs hover:bg-coquette-roseDark transition-all flex items-center gap-1.5 shadow-md hover:scale-105 disabled:opacity-50"
