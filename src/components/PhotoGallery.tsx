@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { birthdayConfig } from '../config/birthdayConfig';
+import { useConfig } from '../context/ConfigContext';
 
 export const PhotoGallery: React.FC = () => {
-  const [selectedPhoto, setSelectedPhoto] = useState<typeof birthdayConfig.photos[0] | null>(null);
+  const { config } = useConfig();
+  const [selectedPhoto, setSelectedPhoto] = useState<typeof config.photos[0] | null>(null);
 
   return (
     <section className="relative py-24 md:py-40 overflow-hidden">
@@ -33,9 +34,9 @@ export const PhotoGallery: React.FC = () => {
 
         {/* Photo Grid — elegant 2x3 */}
         <div className="grid grid-cols-2 md:grid-cols-3 gap-3 md:gap-4">
-          {birthdayConfig.photos.map((photo, index) => (
+          {config.photos.map((photo, index) => (
             <motion.div
-              key={photo.id}
+              key={photo.id || index}
               initial={{ opacity: 0, y: 30 }}
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
@@ -73,7 +74,7 @@ export const PhotoGallery: React.FC = () => {
         >
           <div className="elegant-divider mb-8" />
           <p className="font-elegant text-xl md:text-2xl text-warm-200/25 italic max-w-xl mx-auto leading-relaxed">
-            "{birthdayConfig.quotes[1]}"
+            "{config.aboutQuote}"
           </p>
         </motion.div>
       </div>

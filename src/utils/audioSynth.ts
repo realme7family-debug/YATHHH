@@ -144,20 +144,23 @@ class SoundEngine {
     return this.isPlayingBg;
   }
 
-  private startBackgroundMusic() {
-    if (this.isPlayingBg) return;
-    this.isPlayingBg = true;
-
+  startBackgroundMusic() {
     if (!this.audioEle) {
       const trackSrc = this.customAudioUrl || this.defaultAudioUrl;
       this.audioEle = new Audio(trackSrc);
       this.audioEle.loop = true;
     }
 
-    this.audioEle.play().catch(() => {
-      // If HTML5 audio is blocked by browser autoplay policy, fallback to synth
-      this.startSynthFallback();
-    });
+    this.isPlayingBg = true;
+    const playPromise = this.audioEle.play();
+    if (playPromise !== undefined) {
+      playPromise.then(() => {
+        this.isPlayingBg = true;
+      }).catch((err) => {
+        console.log('Audio playback deferred for user gesture:', err);
+        this.isPlayingBg = false;
+      });
+    }
   }
 
   private startSynthFallback() {
