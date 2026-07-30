@@ -3,14 +3,16 @@ const SUPABASE_API_KEY = 'sb_publishable_iV1GPV3oNzXmgLJbyY4WQw_aN0A_ZiX';
 const TABLE_NAME = 'config';
 const DOC_ID = 'production_config';
 
-const getSupabaseHeaders = () => ({
-  'apikey': SUPABASE_API_KEY,
-  'Authorization': `Bearer ${SUPABASE_API_KEY}`,
-  'Content-Type': 'application/json',
-  'Cache-Control': 'no-cache, no-store, must-revalidate',
-  'Pragma': 'no-cache',
-  'Expires': '0',
-});
+const getSupabaseHeaders = (isWrite = false) => {
+  const headers = {
+    'apikey': SUPABASE_API_KEY,
+    'Authorization': `Bearer ${SUPABASE_API_KEY}`,
+  };
+  if (isWrite) {
+    headers['Content-Type'] = 'application/json';
+  }
+  return headers;
+};
 
 async function parseRequestBody(req) {
   if (req.body) {
@@ -51,7 +53,7 @@ export default async function handler(req, res) {
       try {
         const response = await fetch(`${SUPABASE_BASE_URL}/${TABLE_NAME}?id=eq.${DOC_ID}&select=*`, {
           method: 'GET',
-          headers: getSupabaseHeaders(),
+          headers: getSupabaseHeaders(false),
         });
 
         const status = response.status;
@@ -86,7 +88,7 @@ export default async function handler(req, res) {
         const upsertRes = await fetch(`${SUPABASE_BASE_URL}/${TABLE_NAME}`, {
           method: 'POST',
           headers: {
-            ...getSupabaseHeaders(),
+            ...getSupabaseHeaders(true),
             'Prefer': 'resolution=merge-duplicates,return=representation',
           },
           body: JSON.stringify({
